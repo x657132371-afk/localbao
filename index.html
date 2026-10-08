@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>本地宝</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fa;color:#222}
+.screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{width:min(420px,100%);background:#fff;border-radius:22px;padding:32px 24px;box-shadow:0 10px 35px #00000012;text-align:center}
+.logo{width:72px;height:72px;border-radius:18px;background:#1677ff;color:#fff;display:grid;place-items:center;margin:0 auto 18px;font-size:34px}
+h1{margin:0 0 12px;font-size:28px}.desc{color:#666;line-height:1.7;font-size:14px;margin-bottom:22px}
+button.primary{width:100%;border:0;border-radius:14px;padding:15px;background:#1677ff;color:#fff;font-size:16px;font-weight:600}
+.note{font-size:12px;color:#888;line-height:1.6;margin-top:16px}
+#app{display:none;min-height:100vh}.top{background:#1677ff;color:#fff;padding:50px 20px 26px}.top h1{font-size:26px}.top p{margin:8px 0 0;opacity:.9;font-size:13px}
+.grid{padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.item{background:#fff;border:0;border-radius:18px;padding:22px 12px;font-size:16px;box-shadow:0 4px 16px #00000008;min-height:96px}
+.icon{font-size:28px;display:block;margin-bottom:8px}.toast{position:fixed;left:50%;bottom:35px;transform:translateX(-50%);background:#222;color:#fff;padding:11px 18px;border-radius:99px;font-size:14px;display:none;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="gate" class="screen">
+  <div class="card">
+    <div class="logo">宝</div>
+    <h1>本地宝</h1>
+    <div class="desc">
+      为提供本地服务推荐，本网页将在你主动同意后获取当前位置。
+      <br>定位仅用于本地服务功能，你可以选择是否授权。
+    </div>
+    <button id="allow" class="primary">点击同意获取位置并进入本地宝</button>
+    <div class="note">点击后，手机浏览器会弹出系统定位授权窗口。拒绝授权将无法进入。</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="top"><h1>本地宝</h1><p id="status">定位已授权</p></div>
+  <div class="grid">
+    <button class="item" data-name="医疗预约"><span class="icon">🏥</span>医疗预约</button>
+    <button class="item" data-name="外地入户"><span class="icon">🏠</span>外地入户</button>
+    <button class="item" data-name="社区服务"><span class="icon">🏘️</span>社区服务</button>
+    <button class="item" data-name="义工活动"><span class="icon">🤝</span>义工活动</button>
+    <button class="item" data-name="二手闲置"><span class="icon">📦</span>二手闲置</button>
+    <button class="item" data-name="当地游"><span class="icon">🗺️</span>当地游</button>
+    <button class="item" data-name="工作招聘"><span class="icon">💼</span>工作招聘</button>
+    <button class="item" data-name="法律服务"><span class="icon">⚖️</span>法律服务</button>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const gate = document.getElementById('gate');
+const app = document.getElementById('app');
+const toast = document.getElementById('toast');
+
+function showToast(text){
+  toast.textContent=text; toast.style.display='block';
+  clearTimeout(window.__toast); window.__toast=setTimeout(()=>toast.style.display='none',1800);
+}
+
+document.getElementById('allow').onclick = () => {
+  if(!navigator.geolocation){
+    showToast('当前浏览器不支持定位');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const payload = {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      recordedAt: new Date().toISOString()
+    };
+    try{
+      const r = await fetch('/api/location', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      if(!r.ok) throw new Error('save failed');
+      gate.style.display='none';
+      app.style.display='block';
+    }catch(e){
+      showToast('定位已授权，但暂时无法保存，请稍后重试');
+    }
+  }, err => {
+    if(err.code === 1) showToast('你拒绝了定位授权，无法进入');
+    else if(err.code === 2) showToast('暂时无法获取位置');
+    else showToast('获取定位超时，请重试');
+  }, {enableHighAccuracy:true, timeout:10000, maximumAge:0});
+};
+
+document.querySelectorAll('.item').forEach(btn=>{
+  btn.onclick=()=>showToast(`已点击「${btn.dataset.name}」`);
+});
+</script>
+</body>
+</html>
